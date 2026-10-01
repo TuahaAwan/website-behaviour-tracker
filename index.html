@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Behaviour Tracker</title>
+<style>
+:root{
+  --paper:#f1f3ef; --ink:#17211f; --muted:#5d6b67; --slate:#1b2a2f; --slate2:#26393f;
+  --line:#d6dcd7; --teal:#2fb3a3; --coral:#ff5a3c; --sand:#e9dfc9;
+  --serif:Georgia,"Times New Roman",serif; --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);display:grid;grid-template-columns:minmax(0,1fr) 360px}
+:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
+
+/* ---------- demo page (the thing being tracked) ---------- */
+#site{position:relative;min-width:0}
+#overlay{position:absolute;top:0;left:0;pointer-events:none;z-index:5}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;border-bottom:1px solid var(--line)}
+.nav b{font-family:var(--serif);font-size:22px}
+.nav a{color:var(--ink);text-decoration:none;margin-left:24px;font-size:15px}
+.nav a:hover{color:var(--coral)}
+section{padding:72px 40px}
+.hero{background:var(--sand);padding:110px 40px}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,5vw,64px);line-height:1.05;margin:0 0 18px;max-width:14ch}
+.hero>p{max-width:46ch;font-size:18px;line-height:1.55;color:#3d4a46}
+h2{font-family:var(--serif);font-size:32px;margin:0 0 28px}
+.btn{font:inherit;font-weight:600;padding:12px 22px;border-radius:6px;border:2px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+.btn:hover{background:var(--coral);border-color:var(--coral)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.ghost:hover{color:#fff}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+.card{border:1px solid var(--line);background:#fff;padding:22px;border-radius:4px}
+.card h3{margin:0 0 6px;font-family:var(--serif)}
+.card p{color:var(--muted);font-size:14px;line-height:1.5;min-height:64px}
+.story{background:#fff}
+.story p{max-width:60ch;line-height:1.7;font-size:17px;color:#34413d}
+.plans{display:flex;gap:20px;flex-wrap:wrap}
+.plan{flex:1 1 220px;border:2px solid var(--ink);padding:24px;border-radius:4px}
+.plan strong{font-size:28px;font-family:var(--serif)}
+details{border-top:1px solid var(--line);padding:16px 0;max-width:640px}
+details:last-of-type{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600}
+details p{color:var(--muted);line-height:1.6}
+.news{background:var(--slate);color:#fff}
+.news form{display:flex;gap:10px;flex-wrap:wrap}
+.news input{flex:1 1 220px;padding:12px;border-radius:6px;border:0;font:inherit}
+footer{padding:36px 40px;color:var(--muted);font-size:14px}
+
+.search{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px;max-width:760px}
+.search select{flex:1 1 150px;padding:12px;border-radius:6px;border:1px solid var(--line);font:inherit;background:#fff}
+.pic{height:120px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);color:var(--ink);margin-bottom:14px}
+.price{color:var(--coral)!important;font-weight:700;font-size:18px;min-height:0!important;margin:0 0 4px}
+.card p{min-height:0}
+.card .btn{padding:8px 14px;font-size:14px;margin-top:6px}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+.chip{font:inherit;padding:8px 16px;border-radius:99px;border:1px solid var(--ink);background:transparent;cursor:pointer}
+.chip:hover{background:var(--ink);color:#fff}
+
+/* ---------- tracker panel ---------- */
+#panel{position:sticky;top:0;height:100vh;overflow:auto;background:var(--slate);color:#e8efec;padding:20px;display:flex;flex-direction:column;gap:14px}
+#panel h1{font-size:18px;margin:0;font-family:var(--serif);font-weight:700}
+.head{display:flex;justify-content:space-between;align-items:center}
+.pill{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--slate2);display:flex;align-items:center;gap:6px}
+.pill i{width:8px;height:8px;border-radius:50%;background:#7b8a86}
+.pill.on i{background:var(--coral);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+#panel button,#panel select{font:inherit;font-size:13px;padding:8px 12px;border-radius:6px;border:1px solid #3b5057;background:var(--slate2);color:#fff;cursor:pointer}
+#panel button:hover{border-color:var(--teal)}
+#panel button.primary{background:var(--coral);border-color:var(--coral);font-weight:600}
+label.mode{font-size:13px;display:flex;align-items:center;gap:8px;color:#b9c7c2}
+.tabs{display:flex;border-bottom:1px solid #3b5057}
+.tabs button{border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:none!important;color:#9fb0aa!important;padding:8px 10px!important}
+.tabs button.on{color:#fff!important;border-bottom-color:var(--teal)!important}
+.pane{display:none}.pane.on{display:block}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--slate2);padding:12px;border-radius:6px}
+.stat b{display:block;font-size:22px;font-family:var(--serif)}
+.stat span{font-size:12px;color:#9fb0aa}
+.stat.wide{grid-column:1/-1}
+.stat.wide b{font-size:14px;font-family:var(--sans);word-break:break-word}
+#scatter{width:100%;border-radius:6px;background:#f6f8f5;display:block}
+.hint{font-size:12px;color:#9fb0aa;margin:8px 0 0;line-height:1.5}
+.sec{margin-bottom:12px;font-size:13px}
+.sec div{display:flex;justify-content:space-between}
+.sec .bar{height:6px;background:var(--slate2);border-radius:3px;margin-top:5px;overflow:hidden}
+.sec .bar i{display:block;height:100%;background:var(--teal)}
+.sec.vis .n::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--coral);margin-right:7px}
+#log{list-style:none;margin:0;padding:0;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace}
+#log li{padding:6px 0;border-bottom:1px solid #2f444b;word-break:break-word}
+#log .t{color:#7fd6cb;margin-right:6px}
+#log .k{color:#ffb09f;margin-right:6px}
+
+@media (max-width:900px){
+  body{grid-template-columns:1fr}
+  #panel{order:-1;position:static;height:auto;max-height:70vh}
+  section,.nav,footer{padding-left:20px;padding-right:20px}
+}
+@media (prefers-reduced-motion:reduce){.pill.on i{animation:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<main id="site">
+  <canvas id="overlay"></canvas>
+
+  <header class="nav" data-track="Navigation">
+    <b>GaariHub</b>
+    <nav><a href="#cars">Used Cars</a><a href="#browse">Browse</a><a href="#sell">Sell Your Car</a><a href="#faq">Help</a></nav>
+  </header>
+
+  <section class="hero" data-track="Hero">
+    <h1>Find your next car in Pakistan.</h1>
+    <p>Browse thousands of used and new cars from verified sellers in Lahore, Karachi, Islamabad and beyond.</p>
+    <div class="search">
+      <select aria-label="Make"><option>Any make</option><option>Suzuki</option><option>Toyota</option><option>Honda</option><option>KIA</option><option>Hyundai</option></select>
+      <select aria-label="City"><option>All cities</option><option>Lahore</option><option>Karachi</option><option>Islamabad</option><option>Faisalabad</option></select>
+      <select aria-label="Budget"><option>Any budget</option><option>Under 20 lakh</option><option>20 - 40 lakh</option><option>40 - 70 lakh</option><option>Above 70 lakh</option></select>
+      <button class="btn">Search cars</button>
+    </div>
+  </section>
+
+  <section id="cars" data-track="Featured cars">
+    <h2>Featured used cars</h2>
+    <div class="cards">
+      <div class="card"><div class="pic" style="background:#cfe3df">Suzuki Alto</div><h3>Suzuki Alto VXL AGS</h3><p class="price">PKR 28.5 lakh</p><p>2022 &middot; 18,000 km &middot; Petrol &middot; Lahore</p><button class="btn">View details</button> <button class="btn ghost">Save</button></div>
+      <div class="card"><div class="pic" style="background:#efe3c9">Toyota Corolla</div><h3>Toyota Corolla GLi 1.3</h3><p class="price">PKR 41 lakh</p><p>2019 &middot; 52,000 km &middot; Petrol &middot; Karachi</p><button class="btn">View details</button> <button class="btn ghost">Save</button></div>
+      <div class="card"><div class="pic" style="background:#f3d5cc">Honda Civic</div><h3>Honda Civic Oriel</h3><p class="price">PKR 62 lakh</p><p>2020 &middot; 38,000 km &middot; Petrol &middot; Islamabad</p><button class="btn">View details</button> <button class="btn ghost">Save</button></div>
+      <div class="card"><div class="pic" style="background:#d6dcec">KIA Sportage</div><h3>KIA Sportage Alpha</h3><p class="price">PKR 75 lakh</p><p>2021 &middot; 29,000 km &middot; Petrol &middot; Lahore</p><button class="btn">View details</button> <button class="btn ghost">Save</button></div>
+    </div>
+  </section>
+
+  <section id="browse" class="story" data-track="Browse">
+    <h2>Browse by body type or budget</h2>
+    <p class="chips"><button class="chip">Hatchback</button><button class="chip">Sedan</button><button class="chip">SUV</button><button class="chip">Hybrid</button><button class="chip">Automatic</button><button class="chip">Under 20 lakh</button><button class="chip">Under 40 lakh</button></p>
+    <p>Every listing shows the registration city, the number of owners and whether the car has been inspected, so you can compare cars without messaging every seller.</p>
+  </section>
+
+  <section id="sell" data-track="Sell your car">
+    <h2>Sell your car in three steps</h2>
+    <div class="plans">
+      <div class="plan"><strong>1. Add details</strong><p>Enter the make, model, year and mileage.</p><button class="btn ghost">Start listing</button></div>
+      <div class="plan"><strong>2. Upload photos</strong><p>Add at least six clear photos of the car.</p><button class="btn ghost">See photo tips</button></div>
+      <div class="plan"><strong>3. Get offers</strong><p>Buyers contact you by call or message.</p><button class="btn">Post free ad</button></div>
+    </div>
+  </section>
+
+  <section id="faq" data-track="FAQ">
+    <h2>Questions</h2>
+    <details><summary>Is it free to post an ad?</summary><p>Yes. A basic ad is free and stays live for 30 days.</p></details>
+    <details><summary>How do I know a listing is genuine?</summary><p>Look for the verified seller badge and the inspection report on the listing.</p></details>
+    <details><summary>Can I get the car inspected before buying?</summary><p>Yes. Book an inspection from any listing and a report is ready in one day.</p></details>
+  </section>
+
+  <section class="news" data-track="Price alerts">
+    <h2>Get an alert when the price drops</h2>
+    <form onsubmit="return false"><input type="email" placeholder="you@example.com" aria-label="Email address"><button class="btn">Notify me</button></form>
+  </section>
+
+  <footer data-track="Footer">&copy; GaariHub. A demo page for the Website Behaviour Tracker.</footer>
+</main>
+
+<aside id="panel" aria-label="Tracker controls">
+  <div class="head"><h1>Behaviour Tracker</h1><span class="pill" id="pill"><i></i><span id="pillText">Paused</span></span></div>
+  <div class="row">
+    <button class="primary" id="toggle">Start tracking</button>
+    <button id="clear">Clear</button>
+    <button id="export">Export JSON</button>
+  </div>
+  <label class="mode">Show on page
+    <select id="mode">
+      <option value="heat">Click heatmap</option>
+      <option value="path">Mouse path</option>
+      <option value="clicks">Click markers</option>
+      <option value="off">Nothing</option>
+    </select>
+  </label>
+
+  <div class="tabs" role="tablist">
+    <button class="on" data-tab="overview">Overview</button>
+    <button data-tab="scatter">Scatter</button>
+    <button data-tab="sections">Sections</button>
+    <button data-tab="log">Log</button>
+  </div>
+
+  <div class="pane on" data-pane="overview"><div class="stats" id="stats"></div></div>
+  <div class="pane" data-pane="scatter">
+    <canvas id="scatter" width="320" height="480"></canvas>
+    <p class="hint">Every click, drawn at its position on the whole page. Teal clicks came first, coral ones last. Lines mark every 25% of page height.</p>
+  </div>
+  <div class="pane" data-pane="sections"><div id="secs"></div><p class="hint">Time each section spent at least half in view while tracking was on.</p></div>
+  <div class="pane" data-pane="log"><ul id="log"></ul></div>
+</aside>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const site = $('#site'), overlay = $('#overlay'), octx = overlay.getContext('2d');
+  const MAX_MOVES = 5000, MOVE_GAP = 40, MILESTONES = [25, 50, 75, 100];
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  const fresh = () => ({ running:false, since:null, elapsed:0, clicks:[], moves:[], distance:0,
+                         maxScroll:0, hit:new Set(), log:[], lastMove:0 });
+  let S = fresh();
+  const vis = {};                       // section name -> {el, visible, ms, since}
+
+  const now = () => S.elapsed + (S.running ? performance.now() - S.since : 0);
+  const fmt = ms => { const s = Math.floor(ms/1000); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); };
+  const W = () => site.clientWidth, H = () => site.clientHeight;
+
+  function addLog(type, detail){
+    S.log.push({ t:Math.round(now()), type, detail });
+    if (S.log.length > 500) S.log.shift();
+  }
+  function point(e){ const r = site.getBoundingClientRect(); return { x:Math.round(e.clientX - r.left), y:Math.round(e.clientY - r.top) }; }
+  function describe(el){
+    let s = el.tagName.toLowerCase();
+    if (el.id) s += '#' + el.id; else if (el.classList.length) s += '.' + el.classList[0];
+    const txt = (el.innerText || '').trim().replace(/\s+/g,' ').slice(0,24);
+    if (txt && el.children.length < 2) s += ' "' + txt + '"';
+    return s;
+  }
+  const section = el => (el.closest('[data-track]') || {dataset:{track:'page'}}).dataset.track;
+
+  /* ---------- event capture ---------- */
+  document.addEventListener('click', e => {
+    if (!S.running || e.target.closest('#panel')) return;
+    const p = point(e), target = describe(e.target);
+    S.clicks.push({ ...p, t:Math.round(now()), target, section:section(e.target) });
+    addLog('click', target + ' @ ' + p.x + ',' + p.y);
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!S.running || e.target.closest('#panel')) return;
+    const t = performance.now();
+    if (t - S.lastMove < MOVE_GAP) return;
+    S.lastMove = t;
+    const p = point(e), prev = S.moves[S.moves.length - 1];
+    if (prev) S.distance += Math.hypot(p.x - prev.x, p.y - prev.y);
+    S.moves.push({ ...p, t:Math.round(now()) });
+    if (S.moves.length > MAX_MOVES) S.moves.shift();
+  });
+
+  function onScroll(){
+    if (!S.running) return;
+    const r = site.getBoundingClientRect();
+    const depth = Math.max(0, Math.min(100, Math.round((innerHeight - r.top) / r.height * 100)));
+    if (depth > S.maxScroll) S.maxScroll = depth;
+    MILESTONES.forEach(m => { if (S.maxScroll >= m && !S.hit.has(m)) { S.hit.add(m); addLog('scroll', 'reached ' + m + '% of page'); } });
+  }
+  addEventListener('scroll', onScroll, { passive:true });
+
+  /* ---------- element visibility ---------- */
+  const startCount = v => { if (v.since == null) v.since = now(); };
+  const stopCount  = v => { if (v.since != null) { v.ms += now() - v.since; v.since = null; } };
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      const v = vis[en.target.dataset.track];
+      v.visible = en.isIntersecting;
+      if (S.running) {
+        v.visible ? startCount(v) : stopCount(v);
+        addLog('section', (v.visible ? 'entered ' : 'left ') + en.target.dataset.track);
+      }
+    });
+  }, { threshold:0.5 });
+  document.querySelectorAll('[data-track]').forEach(el => {
+    vis[el.dataset.track] = { el, visible:false, ms:0, since:null };
+    io.observe(el);
+  });
+
+  /* ---------- start / stop / clear / export ---------- */
+  function start(){
+    S.running = true; S.since = performance.now();
+    Object.values(vis).forEach(v => { if (v.visible) startCount(v); });
+    addLog('system', 'tracking started'); onScroll(); ui();
+  }
+  function stop(){
+    Object.values(vis).forEach(stopCount);
+    addLog('system', 'tracking stopped');
+    S.elapsed = now(); S.running = false; S.since = null; ui();
+  }
+  function clear(){
+    const was = S.running; S = fresh();
+    Object.values(vis).forEach(v => { v.ms = 0; v.since = null; });
+    if (was) { S.running = true; S.since = performance.now(); Object.values(vis).forEach(v => { if (v.visible) startCount(v); }); }
+    render();
+  }
+  function stats(){
+    const dur = now(), byTarget = {}, bySec = {};
+    S.clicks.forEach(c => { byTarget[c.target] = (byTarget[c.target]||0) + 1; bySec[c.section] = (bySec[c.section]||0) + 1; });
+    const top = o => Object.entries(o).sort((a,b) => b[1]-a[1])[0];
+    return { durationMs:Math.round(dur), clicks:S.clicks.length,
+      clicksPerMin: dur > 0 ? +(S.clicks.length / (dur/60000)).toFixed(1) : 0,
+      moveEvents:S.moves.length, distancePx:Math.round(S.distance), maxScrollPct:S.maxScroll,
+      topTarget:top(byTarget), topSection:top(bySec) };
+  }
+  function exportJSON(){
+    const data = {
+      meta:{ page:location.href, exportedAt:new Date().toISOString(), viewport:{ w:innerWidth, h:innerHeight },
+             pageSize:{ w:W(), h:H() }, userAgent:navigator.userAgent },
+      summary:stats(), clicks:S.clicks, moves:S.moves,
+      visibility:Object.fromEntries(Object.entries(vis).map(([k,v]) => [k, Math.round(v.ms + (v.since != null ? now()-v.since : 0))])),
+      log:S.log
+    };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type:'application/json' }));
+    a.download = 'behaviour-data-' + Date.now() + '.json';
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  /* ---------- drawing ---------- */
+  const lutCtx = Object.assign(document.createElement('canvas'), { width:256, height:1 }).getContext('2d');
+  const g = lutCtx.createLinearGradient(0,0,256,0);
+  [[0,'#1b3cff'],[.35,'#19d3a8'],[.6,'#ffe14a'],[.8,'#ff8a2a'],[1,'#ff2d2d']].forEach(([o,c]) => g.addColorStop(o,c));
+  lutCtx.fillStyle = g; lutCtx.fillRect(0,0,256,1);
+  const LUT = lutCtx.getImageData(0,0,256,1).data;
+  const off = document.createElement('canvas');
+
+  function heat(){
+    off.width = W(); off.height = H();
+    const c = off.getContext('2d');
+    const blob = (x,y,r,a) => {
+      const gr = c.createRadialGradient(x,y,0,x,y,r);
+      gr.addColorStop(0,'rgba(0,0,0,' + a + ')'); gr.addColorStop(1,'rgba(0,0,0,0)');
+      c.fillStyle = gr; c.fillRect(x-r,y-r,2*r,2*r);
+    };
+    S.moves.forEach(m => blob(m.x, m.y, 20, 0.04));
+    S.clicks.forEach(k => blob(k.x, k.y, 36, 0.35));
+    const img = c.getImageData(0,0,off.width,off.height), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i+3]; if (!a) continue;
+      d[i] = LUT[a*4]; d[i+1] = LUT[a*4+1]; d[i+2] = LUT[a*4+2]; d[i+3] = Math.min(220, a * 1.3);
+    }
+    octx.putImageData(img, 0, 0);
+  }
+  function path(){
+    if (!S.moves.length) return;
+    octx.lineWidth = 1.6; octx.strokeStyle = 'rgba(255,90,60,.7)'; octx.lineJoin = 'round';
+    octx.beginPath(); S.moves.forEach((m,i) => i ? octx.lineTo(m.x,m.y) : octx.moveTo(m.x,m.y)); octx.stroke();
+    const dot = (m,col) => { octx.fillStyle = col; octx.beginPath(); octx.arc(m.x,m.y,6,0,7); octx.fill(); };
+    dot(S.moves[0], '#2fb3a3'); dot(S.moves[S.moves.length-1], '#17211f');
+  }
+  function markers(){
+    S.clicks.forEach((k,i) => {
+      octx.fillStyle = 'rgba(255,90,60,.22)'; octx.strokeStyle = '#ff5a3c'; octx.lineWidth = 2;
+      octx.beginPath(); octx.arc(k.x,k.y,14,0,7); octx.fill(); octx.stroke();
+      octx.fillStyle = '#17211f'; octx.font = '600 12px system-ui'; octx.textAlign = 'center'; octx.textBaseline = 'middle';
+      octx.fillText(i+1, k.x, k.y);
+    });
+  }
+  function drawOverlay(){
+    if (overlay.width !== W() || overlay.height !== H()) { overlay.width = W(); overlay.height = H(); }
+    octx.clearRect(0,0,overlay.width,overlay.height);
+    const m = $('#mode').value;
+    if (m === 'heat') heat(); else if (m === 'path') path(); else if (m === 'clicks') markers();
+  }
+  function drawScatter(){
+    const c = $('#scatter'), w = 320, h = Math.min(1600, Math.round(w * H() / W()));
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.fillStyle = '#f6f8f5'; x.fillRect(0,0,w,h);
+    x.strokeStyle = '#d6dcd7'; x.fillStyle = '#8a9692'; x.font = '10px system-ui'; x.lineWidth = 1;
+    [25,50,75].forEach(p => { const y = h*p/100; x.beginPath(); x.moveTo(0,y); x.lineTo(w,y); x.stroke(); x.fillText(p + '%', 4, y-3); });
+    const total = Math.max(1, now());
+    S.clicks.forEach(k => {
+      const f = Math.min(1, k.t / total);
+      x.fillStyle = 'rgb(' + Math.round(47 + 208*f) + ',' + Math.round(179 - 89*f) + ',' + Math.round(163 - 103*f) + ')';
+      x.beginPath(); x.arc(k.x * w / W(), k.y * h / H(), 4.5, 0, 7); x.fill();
+    });
+    if (!S.clicks.length) { x.fillStyle = '#8a9692'; x.font = '13px system-ui'; x.fillText('Click on the page to plot points', 70, h/2); }
+  }
+
+  /* ---------- panel rendering ---------- */
+  function ui(){
+    $('#toggle').textContent = S.running ? 'Stop tracking' : (S.elapsed ? 'Resume tracking' : 'Start tracking');
+    $('#pill').classList.toggle('on', S.running);
+    $('#pillText').textContent = S.running ? 'Tracking' : 'Paused';
+    render();
+  }
+  function render(){
+    const s = stats(), pane = (document.querySelector('.tabs .on') || {}).dataset.tab;
+    if (pane === 'overview') {
+      const tiles = [['Time tracked', fmt(s.durationMs)], ['Clicks', s.clicks], ['Clicks per minute', s.clicksPerMin],
+                     ['Max scroll depth', s.maxScrollPct + '%'], ['Mouse samples', s.moveEvents], ['Mouse distance', s.distancePx + ' px']];
+      $('#stats').innerHTML = tiles.map(t => '<div class="stat"><b>' + esc(t[1]) + '</b><span>' + t[0] + '</span></div>').join('') +
+        '<div class="stat wide"><span>Most clicked element</span><b>' + (s.topTarget ? esc(s.topTarget[0]) + ' (' + s.topTarget[1] + ')' : 'No clicks yet') + '</b></div>' +
+        '<div class="stat wide"><span>Most clicked section</span><b>' + (s.topSection ? esc(s.topSection[0]) + ' (' + s.topSection[1] + ')' : 'No clicks yet') + '</b></div>';
+    }
+    if (pane === 'scatter') drawScatter();
+    if (pane === 'sections') {
+      const rows = Object.entries(vis).map(([k,v]) => [k, v, v.ms + (v.since != null ? now() - v.since : 0)]);
+      const max = Math.max(1, ...rows.map(r => r[2]));
+      $('#secs').innerHTML = rows.map(([k,v,ms]) =>
+        '<div class="sec' + (v.visible ? ' vis' : '') + '"><div><span class="n">' + esc(k) + '</span><span>' + (ms/1000).toFixed(1) + 's</span></div>' +
+        '<div class="bar"><i style="width:' + Math.round(ms/max*100) + '%"></i></div></div>').join('');
+    }
+    if (pane === 'log') {
+      $('#log').innerHTML = S.log.slice(-120).reverse().map(l =>
+        '<li><span class="t">' + fmt(l.t) + '</span><span class="k">' + l.type + '</span>' + esc(l.detail) + '</li>').join('') ||
+        '<li>No events yet. Press Start tracking.</li>';
+    }
+  }
+
+  /* ---------- wiring ---------- */
+  $('#toggle').onclick = () => S.running ? stop() : start();
+  $('#clear').onclick = clear;
+  $('#export').onclick = exportJSON;
+  $('#mode').onchange = drawOverlay;
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === b.dataset.tab));
+    render();
+  });
+  new ResizeObserver(drawOverlay).observe(site);
+  setInterval(() => { render(); if (S.running) drawOverlay(); }, 500);
+  ui(); drawOverlay();
+})();
+</script>
+</body>
+</html>
